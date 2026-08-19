@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Sound Department — a guide to the frame reader</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,600;9..144,900&family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:opsz,wght@6..72,300;6..72,400;6..72,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --stage:#0B0C0E;        /* a dubbing theatre with the lights down */
+  --panel:#131519;
+  --panel-2:#191C21;
+  --line:#272B33;
+  --paper:#EDE4CF;        /* the film's cream. In here it is the light, not the page */
+  --dim:#8B8577;
+  --dimmer:#5E5A52;
+  --amber:#E0A458;        /* the needle */
+  --green:#7FB069;        /* in the green */
+  --red:#C4462F;          /* over */
+  --track-bed:#4A7C8C;
+  --track-spot:#E0A458;
+  --track-move:#9B7FB0;
+  --track-music:#7FB069;
+  --shadow:0 1px 0 rgba(255,255,255,.04), 0 18px 50px -20px rgba(0,0,0,.9);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation:none!important;transition:none!important}}
+body{
+  margin:0;background:var(--stage);color:var(--paper);
+  font-family:'Newsreader',Georgia,serif;font-size:19px;line-height:1.65;
+  font-weight:300;-webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:860px;margin:0 auto;padding:0 22px}
+
+/* ---------- the meter: a real signal path across the top ---------- */
+.meter{position:fixed;top:0;left:0;right:0;height:3px;z-index:100;background:var(--line)}
+.meter i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--green),var(--amber) 78%,var(--red));transition:width .12s linear}
+
+/* ---------- hero ---------- */
+header{padding:96px 0 40px;border-bottom:1px solid var(--line)}
+.eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--amber);margin:0 0 22px}
+h1{font-family:'Fraunces',serif;font-weight:900;font-size:clamp(42px,8.5vw,78px);
+  line-height:.94;letter-spacing:-.025em;margin:0 0 24px;color:var(--paper)}
+h1 em{font-style:italic;font-weight:300;color:var(--dim);display:block}
+.standfirst{font-size:22px;color:var(--dim);max-width:36em;margin:0 0 34px;line-height:1.55}
+.standfirst b{color:var(--paper);font-weight:400}
+
+/* ---------- the signature: a track stack ---------- */
+.stack{margin:0 0 8px;border:1px solid var(--line);border-radius:3px;overflow:hidden;background:var(--panel)}
+.stack-hd{display:flex;justify-content:space-between;padding:9px 14px;border-bottom:1px solid var(--line);
+  font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dimmer)}
+.trk{display:grid;grid-template-columns:78px 1fr;align-items:center;border-bottom:1px solid var(--line);height:38px}
+.trk:last-child{border-bottom:0}
+.trk b{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  font-weight:500;padding-left:14px;color:var(--dim)}
+.lane{height:100%;position:relative;background:
+  repeating-linear-gradient(90deg,transparent 0 calc(10% - 1px),var(--line) calc(10% - 1px) 10%)}
+.clip{position:absolute;top:8px;height:22px;border-radius:2px;opacity:.85}
+.cap{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--dimmer);margin:0 0 44px;letter-spacing:.02em}
+
+/* ---------- tabs ---------- */
+.tabs{position:sticky;top:3px;z-index:60;background:rgba(11,12,14,.94);
+  backdrop-filter:blur(14px);border-bottom:1px solid var(--line);margin-bottom:52px}
+.tabs-inner{max-width:860px;margin:0 auto;padding:0 22px;display:flex;gap:0}
+.tab{flex:1;background:none;border:0;border-bottom:2px solid transparent;color:var(--dimmer);
+  padding:17px 6px 15px;cursor:pointer;text-align:left;font-family:inherit;
+  transition:color .18s,border-color .18s}
+.tab:hover{color:var(--dim)}
+.tab[aria-selected="true"]{color:var(--paper);border-bottom-color:var(--amber)}
+.tab .role{display:block;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--amber);margin-bottom:5px}
+.tab[aria-selected="false"] .role{color:var(--dimmer)}
+.tab .who{font-family:'Fraunces',serif;font-weight:600;font-size:16.5px;letter-spacing:-.01em}
+.tab .age{display:block;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dimmer);margin-top:3px}
+@media(max-width:620px){.tab .age{display:none}.tab .who{font-size:14px}}
+.tab:focus-visible{outline:2px solid var(--amber);outline-offset:-3px}
+
+/* ---------- panels ---------- */
+[role="tabpanel"][hidden]{display:none}
+[role="tabpanel"]{animation:in .35s ease both}
+@keyframes in{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+
+h2{font-family:'Fraunces',serif;font-weight:600;font-size:clamp(27px,4.4vw,37px);
+  line-height:1.16;letter-spacing:-.02em;margin:62px 0 6px;color:var(--paper)}
+h2:first-of-type{margin-top:0}
+h2 .n{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--amber);
+  letter-spacing:.16em;display:block;margin-bottom:11px;font-weight:500}
+h3{font-family:'Fraunces',serif;font-weight:600;font-size:21px;margin:38px 0 8px;letter-spacing:-.01em}
+p{margin:0 0 19px;max-width:38em}
+a{color:var(--amber);text-decoration:none;border-bottom:1px solid rgba(224,164,88,.32)}
+a:hover{border-bottom-color:var(--amber)}
+strong{font-weight:600;color:#fff}
+em{font-style:italic;color:var(--dim)}
+
+/* ---------- frames ---------- */
+figure{margin:34px 0}
+figure img{width:100%;display:block;border-radius:3px;border:1px solid var(--line);
+  background:var(--panel)}
+figcaption{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--dimmer);
+  margin-top:11px;line-height:1.6;letter-spacing:.01em}
+figcaption b{color:var(--amber);font-weight:500}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:620px){.duo{grid-template-columns:1fr}}
+
+/* ---------- devices ---------- */
+.note{border-left:2px solid var(--amber);padding:3px 0 3px 20px;margin:30px 0;color:var(--dim)}
+.note b{color:var(--paper);font-weight:400}
+.warn{border-left-color:var(--red)}
+.warn b{color:var(--red)}
+pre{background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:17px 19px;
+  overflow-x:auto;font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:1.7;
+  color:var(--dim);margin:12px 0 26px}
+pre b{color:var(--green);font-weight:500}
+pre .c{color:var(--dimmer)}
+code{font-family:'IBM Plex Mono',monospace;font-size:.87em;background:var(--panel-2);
+  padding:2px 6px;border-radius:2px;color:var(--amber)}
+.pre-t{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--dimmer);margin:26px 0 0}
+table{width:100%;border-collapse:collapse;margin:24px 0 30px;font-size:15.5px}
+th{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--dimmer);text-align:left;padding:0 12px 9px 0;border-bottom:1px solid var(--line);font-weight:500}
+td{padding:11px 12px 11px 0;border-bottom:1px solid var(--line);color:var(--dim);vertical-align:top}
+td b{color:var(--paper);font-weight:400}
+ul{padding-left:20px;margin:0 0 22px;max-width:38em}
+li{margin-bottom:9px}
+li::marker{color:var(--amber)}
+svg .s{stroke:var(--line);fill:none}
+svg text{font-family:'IBM Plex Mono',monospace;font-size:10px;fill:var(--dim);letter-spacing:.08em}
+svg .lab{fill:var(--amber)}
+footer{border-top:1px solid var(--line);margin-top:90px;padding:36px 0 70px;
+  font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--dimmer);line-height:1.9}
+</style>
+</head>
+<body>
+<div class="meter"><i id="meter"></i></div>
+
+<header>
+  <div class="wrap">
+    <p class="eyebrow">The Brain Brake · sound department · guide v1</p>
+    <h1>Look at one frame.<em>Hear what belongs in it.</em></h1>
+    <p class="standfirst">This is the manual for <b>soundscape.py</b>, the tool that reads a single still from the film and comes back with a list of sounds. Same guide, three depths. Pick the one that fits you today and change it whenever you like.</p>
+
+    <div class="stack" aria-hidden="true">
+      <div class="stack-hd"><span>Frame 1.1 · 3.64 s</span><span>four layers</span></div>
+      <div class="trk"><b>Bed</b><div class="lane"></div></div>
+      <div class="trk"><b>Spot</b><div class="lane"><i class="clip" style="left:5%;width:26%;background:var(--track-spot)"></i></div></div>
+      <div class="trk"><b>Move</b><div class="lane"></div></div>
+      <div class="trk"><b>Music</b><div class="lane"></div></div>
+    </div>
+    <p class="cap">Three of the four lanes are empty. That is not an unfinished sheet. That is the answer.</p>
+  </div>
+</header>
+
+<nav class="tabs">
+  <div class="tabs-inner" role="tablist" aria-label="Reading level">
+    <button class="tab" role="tab" id="t1" aria-controls="p1" aria-selected="true">
+      <span class="role">Level 01</span><span class="who">The Runner</span><span class="age">start here · age 12 up</span></button>
+    <button class="tab" role="tab" id="t2" aria-controls="p2" aria-selected="false">
+      <span class="role">Level 02</span><span class="who">The Assistant</span><span class="age">you'll use the tool</span></button>
+    <button class="tab" role="tab" id="t3" aria-controls="p3" aria-selected="false">
+      <span class="role">Level 03</span><span class="who">Supervising Editor</span><span class="age">you'll change the tool</span></button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+<!-- ==================== LEVEL 1 ==================== -->
+<section role="tabpanel" id="p1" aria-labelledby="t1">
+
+<h2><span class="n">01 — What this is</span>A film is only half picture</h2>
+
+<p>Turn off the sound on any film you love and watch two minutes of it. It goes flat. The punch stops hurting. The room stops being a room. About half of what you felt was never in the picture at all, it was in your ears, and you never noticed because good sound is invisible.</p>
+
+<p><strong>Sound design is the job of deciding what a picture should sound like.</strong> Not recording it, not mixing it, just deciding. That decision comes first and everything else follows it.</p>
+
+<p>The examples here all come from one short film, <em>The Brain Brake</em>. Two minutes, fifty frames, mostly drawn in pencil. Fifty frames is a lot of deciding, so we built a helper.</p>
+
+<figure>
+  <img loading="lazy" decoding="async" src="https://raw.githubusercontent.com/markoboskoauroville/BRAIN_BRAKE/main/assets/V7/V7_1_1_face.jpg" alt="A pencil drawing of an exhausted runner, mouth open, sweat falling, on completely blank cream paper.">
+  <figcaption><b>Frame 1.1</b> — the very first picture in the film. Before you read on, ask yourself the question the whole guide is about: what does this sound like?</figcaption>
+</figure>
+
+<h2><span class="n">02 — The trap</span>Your brain fills in things that aren't there</h2>
+
+<p>Most people look at that runner and hear a crowd. A stadium. Feet on a track. Wind.</p>
+
+<p>Now look again. <strong>There is no stadium.</strong> There is no track, no crowd, no ground, no sky. There is a man and there is blank cream paper. Everything else you heard, you added yourself, because you have seen a thousand sports films and your brain helpfully supplied the rest.</p>
+
+<p>That is the single most important idea in this guide, so here it is in one line:</p>
+
+<div class="note"><b>If it is not drawn, it does not make a sound.</b></div>
+
+<p>Blank paper is not an empty background waiting to be filled. Blank paper is a decision the artist made, and the sound has to respect it. So the real answer to frame 1.1 is almost nothing. One breath. A man gasping, close and dry, with no room around him at all. Then quiet.</p>
+
+<p>That takes nerve. Silence feels like you forgot to do your job. It isn't. It is the job.</p>
+
+<h2><span class="n">03 — The helper</span>Show it a picture, it writes a list</h2>
+
+<p>Our tool is called <strong>soundscape</strong>. You give it one frame. It looks at the picture with an AI that can actually see, and it hands back a list of sounds that belong there.</p>
+
+<svg viewBox="0 0 640 132" style="width:100%;height:auto;margin:26px 0">
+  <rect class="s" x="8" y="30" width="112" height="72" rx="3"/>
+  <text x="26" y="70">ONE  FRAME</text>
+  <path class="s" d="M132 66 H186" stroke-width="1"/><path class="s" d="M178 61 l8 5 -8 5" stroke-width="1"/>
+  <rect class="s" x="196" y="18" width="150" height="96" rx="3"/>
+  <text x="216" y="52" class="lab">THE LAW</text>
+  <text x="216" y="72">blank paper</text><text x="216" y="88">= silence</text>
+  <path class="s" d="M358 66 H412" stroke-width="1"/><path class="s" d="M404 61 l8 5 -8 5" stroke-width="1"/>
+  <rect class="s" x="422" y="8" width="210" height="116" rx="3"/>
+  <text x="440" y="34">BED   . . . . . . . . . .</text>
+  <text x="440" y="58" class="lab">SPOT  one breath, 0.2s</text>
+  <text x="440" y="82">MOVE  . . . . . . . . . .</text>
+  <text x="440" y="106">MUSIC . . . . . . . . . .</text>
+</svg>
+
+<p>The clever part is the middle box. Before the AI is allowed to look at the picture, we tell it the rules of this particular film. Blank paper means silence. Name what is missing, not just what is there. Never invent an object you cannot see. <strong>Without those rules it hands back a stadium.</strong> With them, it hands back a breath.</p>
+
+<h2><span class="n">04 — Four kinds of sound</span>Everything fits in one of these</h2>
+
+<p>Every sound in every film you have ever seen is one of four things. Once you know them you cannot un-know them, and you will start sorting sounds automatically for the rest of your life. Sorry.</p>
+
+<table>
+<tr><th>Layer</th><th>What it is</th><th>In this film</th></tr>
+<tr><td><b>Bed</b></td><td>The constant hum under a scene. Air, a room, a distant motorway.</td><td>Rare. Most frames are on blank paper, so there is no room to hum.</td></tr>
+<tr><td><b>Spot</b></td><td>One thing happening at one moment. A door, a gasp, a switch.</td><td>The workhorse. Almost every cue in this film is a spot.</td></tr>
+<tr><td><b>Move</b></td><td>A whoosh that carries you from one shot into the next.</td><td>Used on jumps and cuts. Easy to overdo.</td></tr>
+<tr><td><b>Music</b></td><td>The score. Also the decision to have none.</td><td>Sherlock Holmes, Star Wars, Mission Impossible. Adventurous.</td></tr>
+</table>
+
+<figure>
+  <img loading="lazy" decoding="async" src="https://raw.githubusercontent.com/markoboskoauroville/BRAIN_BRAKE/main/assets/V7/V7_6_9_the_leap.jpg" alt="A boy in a hoodie leaping across a gap above sketched rooftops, with pencil speed lines trailing him.">
+  <figcaption><b>Frame 6.9</b> — try sorting this one yourself. The hoodie flapping is a <b>spot</b>. The body rushing past is a <b>move</b>. The sky is blank, so no <b>bed</b>. And the <b>music</b> probably opens up here, because this is the moment the film has been climbing towards.</figcaption>
+</figure>
+
+<h2><span class="n">05 — The one rule to keep</span>The machine suggests. You decide.</h2>
+
+<p>The tool never writes into the real cue sheet. It writes into a separate file marked <em>suggestions</em>. A human being copies the good ones across by hand.</p>
+
+<p>This is not caution for its own sake. On frame 1.1 the AI called that runner's sound <em>"dry fabric rustle"</em>. There <em>is</em> fabric in the frame, so it is not wrong. It is just the wrong choice, because the first sound of a film about a human being under strain has to be the human being.</p>
+
+<p>The machine is a fast assistant with no taste. You are slow and you have taste. That is a good trade, and it is why the two files stay separate.</p>
+
+<div class="note"><b>Next:</b> the Assistant tab shows you how to actually run it.</div>
+</section>
+
+<!-- ==================== LEVEL 2 ==================== -->
+<section role="tabpanel" id="p2" aria-labelledby="t2" hidden>
+
+<h2><span class="n">01 — Orientation</span>What you are operating</h2>
+
+<p><code>soundscape.py</code> takes a frame id, fetches that frame's picture from the film repository, sends it to a vision model wrapped in a prompt that encodes this film's rules, and stores the structured answer. It generates no audio. It produces a <strong>brief</strong>: bed, spot, move and music, each cue carrying both a library search term and a text-to-sound prompt.</p>
+
+<p>That split matters. Every cue arrives with two routes: search a stock library for it, or generate it. You choose per cue.</p>
+
+<p class="pre-t">Set up once per session</p>
+<pre>export VISION_API_KEY=<span class="c">your-gemini-key</span>
+export VISION_ENDPOINT=https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
+export VISION_MODEL=gemini-3.7-flash</pre>
+
+<p class="pre-t">Then</p>
+<pre><b>python3 tools/soundscape.py --frame 1.1</b>        <span class="c"># one frame</span>
+<b>python3 tools/soundscape.py --scene 3</b>          <span class="c"># a whole scene</span>
+<b>python3 tools/soundscape.py --frame 1.1 --dry-run</b> <span class="c"># print the prompt, spend nothing</span>
+<b>python3 tools/soundscape.py --report</b>            <span class="c"># rebuild the readable page</span>
+<b>python3 tools/soundscape.py --reconcile</b>         <span class="c"># check briefs against the current cut</span></pre>
+
+<p><code>--dry-run</code> is the one to learn first. It shows you exactly what will be sent and costs nothing. Read that prompt once, all the way through. Everything the tool believes about the film is in it.</p>
+
+<h2><span class="n">02 — Where the intelligence lives</span>Not in the model. In the prompt.</h2>
+
+<p>A general vision model is trained on photographs. Point it at a pencil drawing of a runner and it recognises "runner", reaches for everything that usually accompanies runners, and returns a soundscape for a stadium that does not exist.</p>
+
+<p>So the prompt states the film's law before the model is allowed to look:</p>
+
+<pre>1. Describe ONLY what is in the picture. If the drawing stops and
+   the paper is blank, the world stops there too.
+2. Name what is ABSENT as explicitly as what is present.
+3. This frame is DRAWN / LIVE / STRIP / BOOTH. [world description]
+4. The running time is fixed. Sound may never ask for another frame.
+5. The mix is judged on a phone speaker.</pre>
+
+<p><strong>It works.</strong> Tested on 18 August against Gemini and Groq, both models correctly reported that frame 1.1 has no stadium, no crowd and no track, and that the absence means silence. That was not the predicted result. The rules are load-bearing, so do not trim them to save tokens.</p>
+
+<h2><span class="n">03 — The four worlds</span>The same object sounds different depending on what it is made of</h2>
+
+<p>Each frame is tagged with which world it belongs to, and the prompt swaps in a different paragraph accordingly. This is the highest-leverage part of the design.</p>
+
+<table>
+<tr><th>Layer</th><th>Sound world</th></tr>
+<tr><td><b>DRAWN</b></td><td>Pencil on cream paper. Nothing was ever photographed. Dry, small, sitting under the paper texture. Blank paper is silence, not room tone.</td></tr>
+<tr><td><b>LIVE</b></td><td>A photographed human composited into the drawn world. The only place real air, real breath and real reverb belong. The contrast is the point.</td></tr>
+<tr><td><b>STRIP</b></td><td>Comic panel, Coach Brain. A voice inside the skull. Close, enclosed, never shouted.</td></tr>
+<tr><td><b>BOOTH</b></td><td>The endcard. A sheet of paper writing itself. Paper and graphite, nothing else.</td></tr>
+</table>
+
+<figure class="duo">
+  <img loading="lazy" decoding="async" src="https://raw.githubusercontent.com/markoboskoauroville/BRAIN_BRAKE/main/assets/V7/V7_3_4_tanks.jpg" alt="A photographed boy from behind, looking down a corridor of hand-drawn industrial tanks.">
+  <img loading="lazy" decoding="async" src="https://raw.githubusercontent.com/markoboskoauroville/BRAIN_BRAKE/main/assets/V7/V7_6_1_check_green.jpg" alt="A cartoon brain in a tracksuit and headset operating a control console covered in blank dials and screens.">
+</figure>
+<figcaption style="margin-top:-22px"><b>3.4, LIVE</b> and <b>6.1, STRIP</b>. A real boy against drawn tanks, and a brain in a headset inside a console. Same tool, same prompt skeleton, two completely different sound worlds swapped into paragraph three.</figcaption>
+
+<h2><span class="n">04 — Reading a brief</span>And knowing when to argue with it</h2>
+
+<p>Each cue comes back with a name, a reason, a library search term, a generator prompt, and a level in dB. Spots also carry <code>at_s</code>, seconds from the start of that frame.</p>
+
+<p>Here is the real machine output for 1.1, unedited, next to what a human wrote by eye before any model saw the frame:</p>
+
+<table>
+<tr><th></th><th>Proposed</th><th>Verdict</th></tr>
+<tr><td><b>Gemini</b></td><td>Dry ragged open-mouth panting, 0.2 s, −14 dB</td><td>Matches the human note almost exactly</td></tr>
+<tr><td><b>Groq</b></td><td>Dry fabric rustle, 0.5 s, −18 dB</td><td>Not wrong. Wrong choice.</td></tr>
+<tr><td><b>Human</b></td><td>One exhausted breath, close, dry, no reverb, 0:00</td><td>—</td></tr>
+</table>
+
+<p>Groq saw a man with his mouth open gasping and proposed the sound of his shirt. Both observations are true. Only one is the first sound of the film.</p>
+
+<div class="note warn"><b>Gemini over-scores.</b> It offers a bed, a spot and music on nearly every frame. Assume roughly one layer too many and cut. That is the right direction of error, because deleting a cue you can hear is easier than imagining one you never wrote.</div>
+
+<h2><span class="n">05 — Nothing is overwritten, ever</span></h2>
+
+<p>Suggestions go to <code>assets/spotting/suggestions.json</code>. Decisions live in <code>assets/spotting/spotting.csv</code>. The tool writes only to the first and cannot touch the second.</p>
+
+<p>Re-briefing a frame does not replace the old brief either. The new one becomes <em>current</em> and the old one is pushed onto <em>superseded</em>, in order, with its original timestamp. You can always read what the machine said last week and why you disagreed.</p>
+
+<p>And when the picture changes, <code>--reconcile</code> compares every stored brief against the current cut. A frame that no longer exists is reported as <strong>orphaned</strong>, never deleted. A cue that now lands past its frame's out point is reported as <strong>overrun</strong>. This matters more than it sounds: between v3 and v4 of this film, forty frames got shorter. A cue written at 0.6 seconds into a frame that used to run 0.72 and now runs 0.40 did not move. The frame moved out from under it. Nothing raises an error. Only reconciling finds it.</p>
+
+<h2><span class="n">06 — Things that will bite you</span></h2>
+
+<ul>
+<li><strong>403 with "error code: 1010"</strong> is not a dead key. Groq and Hume sit behind Cloudflare, which rejects the default Python user agent. Ten perfectly valid keys once looked dead for this reason. Check the header before you touch the keys.</li>
+<li><strong>Groq returns HTTP 413 on images</strong> for eight of the ten keys in the ring, regardless of size. Two work. Downscale frames to roughly 180 KB.</li>
+<li><strong>Qwen thinks out loud.</strong> Set <code>reasoning_effort: "none"</code> or the reasoning eats the token budget and the JSON never arrives. Groq accepts only <code>none</code> or <code>default</code> for that field.</li>
+<li><strong>Two frames have no picture.</strong> 4.4b and 4.8 were shot on 18 August. Until they are in the repo the tool cannot read them, and the test suite names them deliberately so that it goes red when they land.</li>
+</ul>
+
+<div class="note"><b>Next:</b> the Supervising Editor tab covers the internals, the test discipline, and what is still unproven.</div>
+</section>
+
+<!-- ==================== LEVEL 3 ==================== -->
+<section role="tabpanel" id="p3" aria-labelledby="t3" hidden>
+
+<h2><span class="n">01 — Position</span>Why this is not a video-to-audio model</h2>
+
+<p>The obvious architecture for this problem is end-to-end video-to-audio: encode frames, detect visual onsets, force audio transients onto those frames, generate with a latent diffusion model conditioned on the visual embedding. That is roughly what the current generation of tools does, and it is the wrong instrument here.</p>
+
+<p>Those models are trained on audio-visual corpora of <em>photographed reality</em>. Their learned prior maps "runner" to the acoustic environment that statistically accompanies runners. On a film whose defining formal choice is that <strong>the environment is not drawn</strong>, that prior is not merely unhelpful, it is precisely inverted. The model's confidence is highest exactly where the film is most deliberate.</p>
+
+<p>So the system splits the problem. The vision model does perception and is constrained by an explicit normative frame. Selection and generation stay with the human and with tools the human drives. The artefact passed between them is a <strong>brief</strong>, in a schema, with both a retrieval key and a generation key per cue. The machine reads. It does not choose.</p>
+
+<h2><span class="n">02 — The prompt as specification</span></h2>
+
+<p>The law block is not prompt decoration, it is the specification, and it is ordered adversarially. The film's own text, dialogue lines and camera notes, reaches the prompt as data and could in principle contain instructions. Therefore the law is stated before any film-derived text appears, film text is confined below a <code>THE FRAME</code> marker, and the final sentence of the prompt is ours, not the film's. Test 3 asserts all four properties by index comparison, and asserts that the prompt's last token is <em>"not in the picture."</em></p>
+
+<p>There is also a duration-conditional branch. Below 0.5 s a frame cannot hold its own sound event, so the prompt swaps in language telling the model that returning empty lists is a correct answer. Roughly a third of this film's frames are under 0.5 s. Both sides of that boundary are tested at 0.49, 0.50 and 0.51.</p>
+
+<h2><span class="n">03 — Failure modes found by running it for real</span></h2>
+
+<p>Two defects surfaced only against live models, and neither would have appeared against hand-written fixtures.</p>
+
+<h3>The reasoning-block mine</h3>
+<p>Qwen emits <code>&lt;think&gt;</code> before answering. On a truncated response the parser's first-brace-to-last-brace scan lifted a JSON fragment out of the model's own deliberation and returned a syntactically valid, semantically empty brief. <strong>It reported success.</strong> A confidently wrong answer is worse than no answer, and this one was invisible: the frame appeared briefed. Fixed by stripping terminated <code>&lt;think&gt;</code> blocks and refusing unterminated ones outright.</p>
+
+<h3>The empty brief</h3>
+<p>A response with no reading and no cues in any layer now raises. Silence is a legitimate and frequent decision on this film, but it must be <em>stated</em>, not merely absent, because absence is indistinguishable from truncation. This was a deliberate behaviour change; prior expectations asserting <code>{}</code> was valid were updated and annotated in place rather than deleted, so the change is visible in the diff.</p>
+
+<div class="note warn"><b>Infrastructure, not intelligence.</b> Both Groq and Hume return 403 <code>error code: 1010</code> to a default Python user agent, on every endpoint, with valid credentials. This presents as total key failure. The client now sends a browser agent, and test 3 stands up a local socket to confirm the header is on the wire rather than merely in the source.</div>
+
+<h2><span class="n">04 — Test discipline</span></h2>
+
+<p>Four tests, and the property that matters is that each can fail while the other three pass. Verified by targeted sabotage, each producing exactly one red column.</p>
+
+<table>
+<tr><th>Sabotage</th><th>1</th><th>2</th><th>3</th><th>4</th></tr>
+<tr><td><b>_num stops stripping units from "−30 dB"</b></td><td style="color:var(--red)">RED</td><td>·</td><td>·</td><td>·</td></tr>
+<tr><td><b>picture base points at the wrong folder</b></td><td>·</td><td style="color:var(--red)">RED</td><td>·</td><td>·</td></tr>
+<tr><td><b>read deadline removed from the vision call</b></td><td>·</td><td>·</td><td style="color:var(--red)">RED</td><td>·</td></tr>
+<tr><td><b>merge overwrites instead of superseding</b></td><td>·</td><td>·</td><td>·</td><td style="color:var(--red)">RED</td></tr>
+<tr><td><b>reconcile silently drops orphans</b></td><td>·</td><td>·</td><td>·</td><td style="color:var(--red)">RED</td></tr>
+</table>
+
+<p><strong>Test 1</strong> is the mechanism alone. <strong>Test 2</strong> drives the real CLI against the real fifty-frame film over the real network, and takes its expectations from measurement: the strongest assertion in it compares bytes received against GitHub's own <code>Content-Length</code> header, a number this process does not control.</p>
+
+<p><strong>Test 3</strong> is the ugly cases, and its centrepiece is a socket that accepts the connection and then says nothing for ever. A call that neither resolves nor rejects reaches no catch handler, because nothing is ever raised. Every wait on anything outside the process carries a deadline and the deadline has its own test, including the crueller variant where headers arrive and the body never does.</p>
+
+<p><strong>Test 4</strong> is the upgrade, run against the film's real v3 to v4 transition: 45 frames to 50, four retired, nine new, forty shortened, the whole cut 20 frames tighter. Suggestions written legally against v3 are checked for orphaning and overrun against v4. Expectations are measured from the v3 file, never assumed.</p>
+
+<pre>tools/spotting.py     56 / 32 / 34 / 38   passed, 0 failed
+<b>tools/soundscape.py  102 / 197 / 70 / 61   passed, 0 failed</b></pre>
+
+<h2><span class="n">05 — A test that skipped its own broken cases</span></h2>
+
+<p>Worth recording, because it passed for the wrong reason for two sessions.</p>
+
+<p>The picture fetcher assumed all fifty frames lived in <code>assets/V7/</code>. Measured against the repository tree, they do not: 39 are in <code>assets/V7</code>, 5 in <code>boards/v5</code>, 3 in <code>assets/V3A</code>, 1 in <code>boards/v4</code>. Nine frames were unreadable.</p>
+
+<p>Test 2 did not catch it, because the test contained <code>if not name.startswith("V7_"): continue</code>. It skipped precisely the frames that were broken and reported green. The fetcher now tries each known folder, treating 404 as "keep looking" and any other status as a network fault worth raising at once, and the test checks all fifty with no exemptions.</p>
+
+<h2><span class="n">06 — What remains unproven</span></h2>
+
+<ul>
+<li>Only <strong>four of fifty</strong> frames have been briefed by a live model. Nothing above is a claim about the other forty-six.</li>
+<li>Frame 6.9 was never completed on Groq. Rate limited on every key. Its comparison column is empty.</li>
+<li>The STRIP world was tested on 6.1 only, and Groq failed that frame, so the comic-panel comparison is Gemini against the human alone, with no third reading.</li>
+<li>Hume was exercised for one line, one direction, one generation. Nothing about consistency across takes has been measured.</li>
+<li><strong>Nothing has been mixed, heard, or checked on a phone speaker.</strong> Every judgement in this guide concerns text describing sound, not sound. That gap is the entire remaining project.</li>
+</ul>
+
+</section>
+</main>
+
+<footer class="wrap">
+  Mantra Productions · sound department · guide v1, 19 August 2026<br>
+  Frames from THE BRAIN BRAKE. Tool, tests and notes in the SOUND_DESIGN repository.<br>
+  The machine suggests. You decide.
+</footer>
+
+<script>
+(function(){
+  var tabs=[].slice.call(document.querySelectorAll('.tab'));
+  function show(i){
+    tabs.forEach(function(t,j){
+      var p=document.getElementById(t.getAttribute('aria-controls'));
+      t.setAttribute('aria-selected',j===i);
+      t.tabIndex=j===i?0:-1;
+      p.hidden=j!==i;
+    });
+    window.scrollTo({top:0,behavior:'instant'});
+    try{location.hash='level'+(i+1);}catch(e){}
+  }
+  tabs.forEach(function(t,i){
+    t.addEventListener('click',function(){show(i);});
+    t.addEventListener('keydown',function(e){
+      var n=e.key==='ArrowRight'?i+1:e.key==='ArrowLeft'?i-1:null;
+      if(n===null)return;
+      e.preventDefault();
+      n=(n+tabs.length)%tabs.length;
+      show(n);tabs[n].focus();
+    });
+  });
+  var m=(location.hash.match(/level(\d)/)||[])[1];
+  show(m?Math.min(3,Math.max(1,+m))-1:0);
+
+  var meter=document.getElementById('meter');
+  function level(){
+    var h=document.documentElement;
+    var max=h.scrollHeight-h.clientHeight;
+    meter.style.width=(max>0?(h.scrollTop/max)*100:0)+'%';
+  }
+  addEventListener('scroll',level,{passive:true});addEventListener('resize',level);level();
+})();
+</script>
+</body>
+</html>
